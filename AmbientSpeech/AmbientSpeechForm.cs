@@ -1,19 +1,24 @@
 ﻿using Microsoft.ProjectOxford.SpeechRecognition;
 using System;
+using System.ComponentModel;
 using System.Configuration;
+using System.Drawing;
 using System.Windows.Forms;
 
 namespace AmbientSpeech
 {
     public partial class AmbientSpeechForm : Form
     {
+        private const string LANGUAGE = "en-us";
+
+        private string oxfordKey;
+        private MicrophoneRecognitionClient micClient;
+        private ComponentResourceManager resources;
+        private IPresenceDetector presenceDetector;
+
         private delegate void WriteTextBoxLineCallback(TextBox textBox, string text);
         private delegate void ClearTextBoxCallback(TextBox textBox);
-
-        private MicrophoneRecognitionClient micClient;
-        private string oxfordKey;
-
-        private const string LANGUAGE = "en-us";
+        private delegate void SetMicImageCallback(bool on);
 
         public AmbientSpeechForm()
         {
@@ -23,16 +28,29 @@ namespace AmbientSpeech
         private void AmbientSpeechForm_Load(object sender, EventArgs e)
         {
             oxfordKey = ConfigurationManager.AppSettings["OxfordKey"];
-            InitMicClient();
+            resources = new ComponentResourceManager(typeof(AmbientSpeechForm));
+            InitMicClient(false);
+            InitPresenceDetector();
         }
 
-        private void InitMicClient()
+        private void InitPresenceDetector()
         {
-            if(micClient != null)
+            if (presenceDetector != null)
             {
-                micClient.Dispose();
-                micClient = null;
+                presenceDetector.StopWatching();
             }
+
+            presenceDetector = new KinectPresenceDetector();
+            presenceDetector.PresenceTimeoutSeconds = 1;
+            presenceDetector.PresenceDetected += PresenceDetector_PresenceDetected;
+            presenceDetector.PresenceTimeout += PresenceDetector_PresenceTimeout;
+
+            presenceDetector.StartWatching();
+        }
+
+        private void InitMicClient(bool startListening)
+        {
+            DestroyMicClient();
 
             micClient = SpeechRecognitionServiceFactory.CreateMicrophoneClient(
                 SpeechRecognitionMode.LongDictation,
@@ -44,7 +62,17 @@ namespace AmbientSpeech
             micClient.OnResponseReceived += OnMicDictationResponseReceivedHandler;
             micClient.OnConversationError += OnConversationErrorHandler;
 
-            micClient.StartMicAndRecognition();
+            if (startListening)
+                micClient.StartMicAndRecognition();
+        }
+
+        private void DestroyMicClient()
+        {
+            if (micClient != null)
+            {
+                micClient.Dispose();
+                micClient = null;
+            }
         }
 
         private void WriteTextBoxLine(TextBox txt, string message)
@@ -77,7 +105,37 @@ namespace AmbientSpeech
             }
         }
 
+        private void SetMicImage(bool on)
+        {
+            if (listeningIndicator.InvokeRequired)
+            {
+                SetMicImageCallback d = new SetMicImageCallback(SetMicImage);
+                Invoke(d, new object[] { on });
+            }
+            else
+            {
+                string fileName = String.Format("Resources\\{0}.png", on ? "micon" : "micoff");
+                listeningIndicator.Image = Image.FromFile(fileName);
+            }
+        }
+
         #region Event Handlers
+
+        private void PresenceDetector_PresenceTimeout(object sender, EventArgs e)
+        {
+            DestroyMicClient();
+            SetMicImage(false);
+            WriteTextBoxLine(txtPartial, "NOT LISTENING...");
+        }
+
+        private void PresenceDetector_PresenceDetected(object sender, EventArgs e)
+        {
+            if (micClient == null)
+                InitMicClient(false);
+
+            micClient.StartMicAndRecognition();
+            SetMicImage(true);
+        }
 
         private void OnConversationErrorHandler(object sender, SpeechErrorEventArgs e)
         {
@@ -87,7 +145,7 @@ namespace AmbientSpeech
             WriteTextBoxLine(txtFinal, String.Format("ERROR TEXT: {0}", e.SpeechErrorText));
             WriteTextBoxLine(txtFinal, String.Empty);
 
-            InitMicClient();
+            InitMicClient(true);
         }
 
         private void OnMicDictationResponseReceivedHandler(object sender, SpeechResponseEventArgs e)
@@ -117,7 +175,7 @@ namespace AmbientSpeech
                 WriteTextBoxLine(txtFinal, String.Empty);
             }
 
-            InitMicClient();
+            InitMicClient(true);
         }
 
         private void OnPartialResponseReceivedHandler(object sender, PartialSpeechResponseEventArgs e)
@@ -132,5 +190,11 @@ namespace AmbientSpeech
         }
 
         #endregion
+
+        private void AmbientSpeechForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            presenceDetector.StopWatching();
+            DestroyMicClient();
+        }
     }
 }
