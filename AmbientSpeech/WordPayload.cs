@@ -10,5 +10,7 @@ namespace AmbientSpeech
     {
         public DateTime WordTime { get; set; }
         public string Word { get; set; }
+        public string Location { get; set; }
+        public string DeviceName { get; set; }
     }
 }

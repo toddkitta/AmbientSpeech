@@ -12,9 +12,11 @@ namespace AmbientSpeech
         private const string LANGUAGE = "en-us";
 
         private string oxfordKey;
+        private string deviceLocation;
+        private string deviceName;
         private MicrophoneRecognitionClient micClient;
-        private ComponentResourceManager resources;
         private IPresenceDetector presenceDetector;
+        private EventHubClient<WordPayload> eventHubClient;
 
         private delegate void WriteTextBoxLineCallback(TextBox textBox, string text);
         private delegate void ClearTextBoxCallback(TextBox textBox);
@@ -28,7 +30,16 @@ namespace AmbientSpeech
         private void AmbientSpeechForm_Load(object sender, EventArgs e)
         {
             oxfordKey = ConfigurationManager.AppSettings["OxfordKey"];
-            resources = new ComponentResourceManager(typeof(AmbientSpeechForm));
+            deviceLocation = ConfigurationManager.AppSettings["Location"];
+            deviceName = ConfigurationManager.AppSettings["DeviceName"];
+
+            eventHubClient = new EventHubClient<WordPayload>(
+                ConfigurationManager.AppSettings["EventHubTokenApiEndpoint"],
+                ConfigurationManager.AppSettings["ServiceBusNamespace"],
+                ConfigurationManager.AppSettings["EventHub"],
+                ConfigurationManager.AppSettings["EventHubPolicyName"],
+                ConfigurationManager.AppSettings["DeviceId"]);
+
             InitMicClient(false);
             InitKinectPresenceDetector();
         }
@@ -175,10 +186,13 @@ namespace AmbientSpeech
                 }
                 WriteTextBoxLine(txtFinal, String.Empty);
 
+                DateTime dtm = DateTime.Now;
+
                 // send results here
-                foreach(var w in e.PhraseResponse.Results[0].DisplayText.GetCleansedWords())
+                foreach (var w in e.PhraseResponse.Results[0].DisplayText.GetCleansedWords())
                 {
-                    WriteTextBoxLine(wordOutput, w.Word);
+                    eventHubClient.PostPayload(new WordPayload() { Word = w, WordTime = dtm, DeviceName = deviceName, Location = deviceLocation });
+                    WriteTextBoxLine(wordOutput, w);
                 }
             }
 

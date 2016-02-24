@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json;
 using System;
+using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
@@ -12,21 +13,14 @@ namespace AmbientSpeech
         public string DeviceId { get; }
         public string ServiceBusNamespace { get; }
         public string EventHub { get; }
+        public string PolicyName { get; }
 
         private string sasToken = null;
 
-        // http://mtcsastokenapi.azurewebsites.net/api/v1
-        // {52F7CD55-377C-4994-9B0B-7A780C1A69B2}
-        // ambientwords
-        // Send
-
-        public EventHubClient(string apiEndpoint, string deviceId, string serviceBusNamespace, string eventHub)
+        public EventHubClient(string apiEndpoint, string serviceBusNamespace, string eventHub, string policyName, string deviceId)
         {
             if (String.IsNullOrWhiteSpace(apiEndpoint))
                 throw new ArgumentNullException(nameof(apiEndpoint));
-
-            if (String.IsNullOrWhiteSpace(deviceId))
-                throw new ArgumentNullException(nameof(deviceId));
 
             if (String.IsNullOrWhiteSpace(serviceBusNamespace))
                 throw new ArgumentNullException(nameof(serviceBusNamespace));
@@ -34,10 +28,17 @@ namespace AmbientSpeech
             if (String.IsNullOrWhiteSpace(eventHub))
                 throw new ArgumentNullException(nameof(eventHub));
 
+            if (String.IsNullOrWhiteSpace(policyName))
+                throw new ArgumentNullException(nameof(policyName));
+
+            if (String.IsNullOrWhiteSpace(deviceId))
+                throw new ArgumentNullException(nameof(deviceId));
+
             SasTokenApiEndpoint = apiEndpoint;
             DeviceId = deviceId;
             ServiceBusNamespace = serviceBusNamespace;
             EventHub = eventHub;
+            PolicyName = policyName;
         }
 
         private async Task EnsureSasToken()
@@ -46,7 +47,7 @@ namespace AmbientSpeech
                 return;
 
             HttpClient http = new HttpClient();
-            var response = await http.GetAsync($"{SasTokenApiEndpoint}Token?deviceId={DeviceId}&hub={EventHub}&ServiceNamespace={ServiceBusNamespace}");
+            var response = await http.GetAsync($"{SasTokenApiEndpoint}/api/v1/sastoken/{ServiceBusNamespace}/{EventHub}/{PolicyName}/{DeviceId}");
             sasToken = (await response.Content.ReadAsStringAsync()).Replace("\"", "");
         }
 
@@ -70,6 +71,16 @@ namespace AmbientSpeech
             content.Headers.Add("ContentType", "application/json");
 
             var response = await httpClient.PostAsync(url, content);
+
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                // time to get a new token
+                sasToken = null;
+                await EnsureSasToken();
+
+                // try again
+                response = await httpClient.PostAsync(url, content);
+            }
         }
     }
 
