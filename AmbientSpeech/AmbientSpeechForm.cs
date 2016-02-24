@@ -81,7 +81,7 @@ namespace AmbientSpeech
         {
             if (micClient != null)
             {
-                micClient.EndMicAndRecognition();
+                //micClient.EndMicAndRecognition();
                 micClient.Dispose();
                 micClient = null;
             }
@@ -131,8 +131,6 @@ namespace AmbientSpeech
             }
         }
 
-        #region Event Handlers
-
         private void PresenceDetector_PresenceTimeout(object sender, EventArgs e)
         {
             DestroyMicClient();
@@ -148,6 +146,8 @@ namespace AmbientSpeech
             micClient.StartMicAndRecognition();
             SetMicImage(true);
         }
+
+        #region Mic Event Handlers
 
         private void OnConversationErrorHandler(object sender, SpeechErrorEventArgs e)
         {
@@ -187,6 +187,7 @@ namespace AmbientSpeech
                 WriteTextBoxLine(txtFinal, String.Empty);
 
                 DateTime dtm = DateTime.Now;
+
 
                 // send results here
                 foreach (var w in e.PhraseResponse.Results[0].DisplayText.GetCleansedWords())

@@ -48,7 +48,12 @@ namespace AmbientSpeech
 
             HttpClient http = new HttpClient();
             var response = await http.GetAsync($"{SasTokenApiEndpoint}/api/v1/sastoken/{ServiceBusNamespace}/{EventHub}/{PolicyName}/{DeviceId}");
-            sasToken = (await response.Content.ReadAsStringAsync()).Replace("\"", "");
+            string responseJson = await response.Content.ReadAsStringAsync();
+
+            var tokenPayload = new { Token = String.Empty, TTL = String.Empty };
+            var tokenResponse = JsonConvert.DeserializeAnonymousType(responseJson, tokenPayload);
+
+            sasToken = tokenResponse.Token;
         }
 
         public async void PostPayload(T payload)
@@ -68,7 +73,7 @@ namespace AmbientSpeech
 
             string serializedPayload = JsonConvert.SerializeObject(payload);
             var content = new StringContent(serializedPayload, Encoding.UTF8, "application/json");
-            content.Headers.Add("ContentType", "application/json");
+            content.Headers.Add("ContentType", "application/atom+xml;type=entry;charset=utf-8");
 
             var response = await httpClient.PostAsync(url, content);
 
