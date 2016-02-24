@@ -1,9 +1,6 @@
 ﻿using Microsoft.Kinect;
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace AmbientSpeech
 {
@@ -37,8 +34,8 @@ namespace AmbientSpeech
 
         public void StartWatching()
         {
-            if (sensor == null)// || !sensor.IsAvailable)
-                throw new InvalidOperationException("Kinect Sensor is null or not available.");
+            if (sensor == null)
+                throw new InvalidOperationException("Kinect Sensor is null.");
 
             bodyFrameReader = sensor.BodyFrameSource.OpenReader();
             bodyFrameReader.FrameArrived += BodyFrameReader_FrameArrived;
@@ -47,9 +44,12 @@ namespace AmbientSpeech
 
         public void StopWatching()
         {
-            bodyFrameReader.FrameArrived -= BodyFrameReader_FrameArrived;
-            bodyFrameReader.Dispose();
-            bodyFrameReader = null;
+            if (bodyFrameReader != null)
+            {
+                bodyFrameReader.FrameArrived -= BodyFrameReader_FrameArrived;
+                bodyFrameReader.Dispose();
+                bodyFrameReader = null;
+            }
 
             sensor.Close();
         }

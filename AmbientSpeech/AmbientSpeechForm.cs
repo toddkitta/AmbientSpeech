@@ -30,10 +30,10 @@ namespace AmbientSpeech
             oxfordKey = ConfigurationManager.AppSettings["OxfordKey"];
             resources = new ComponentResourceManager(typeof(AmbientSpeechForm));
             InitMicClient(false);
-            InitPresenceDetector();
+            InitKinectPresenceDetector();
         }
 
-        private void InitPresenceDetector()
+        private void InitKinectPresenceDetector()
         {
             if (presenceDetector != null)
             {
@@ -70,6 +70,7 @@ namespace AmbientSpeech
         {
             if (micClient != null)
             {
+                micClient.EndMicAndRecognition();
                 micClient.Dispose();
                 micClient = null;
             }
@@ -173,6 +174,12 @@ namespace AmbientSpeech
                             e.PhraseResponse.Results[i].DisplayText));
                 }
                 WriteTextBoxLine(txtFinal, String.Empty);
+
+                // send results here
+                foreach(var w in e.PhraseResponse.Results[0].DisplayText.GetCleansedWords())
+                {
+                    WriteTextBoxLine(wordOutput, w.Word);
+                }
             }
 
             InitMicClient(true);
@@ -195,6 +202,23 @@ namespace AmbientSpeech
         {
             presenceDetector.StopWatching();
             DestroyMicClient();
+        }
+
+        private void alwaysListen_CheckedChanged(object sender, EventArgs e)
+        {
+            if (alwaysListen.Checked)
+            {
+                presenceDetector.StopWatching();
+                InitMicClient(true);
+                SetMicImage(true);
+            }
+            else
+            {
+                SetMicImage(false);
+                WriteTextBoxLine(txtPartial, "NOT LISTENING...");
+                DestroyMicClient();
+                InitKinectPresenceDetector();
+            }
         }
     }
 }
